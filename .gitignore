@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Original Windows distribution and generated artifacts
+Pdg2Pic4.08/
+tests/*.pdf
+tests/*.zip
