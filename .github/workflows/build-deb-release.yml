@@ -1,0 +1,72 @@
+name: Build Debian package and release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev djvulibre-bin
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build Debian package
+        run: ./packaging/build-deb.sh
+
+      - name: Read package metadata
+        id: metadata
+        shell: bash
+        run: |
+          version=$(sed -n 's/^pdg2pdf-linux (\([^)]*\)).*/\1/p' debian/changelog | cut -d- -f1)
+          arch=$(dpkg --print-architecture)
+          package="pdg2pdf-linux_${version}_${arch}.deb"
+          test -f "../$package"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "release_tag=v${version}-build.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect Debian package
+        run: |
+          dpkg-deb --info "../${{ steps.metadata.outputs.package }}"
+          dpkg-deb --contents "../${{ steps.metadata.outputs.package }}"
+
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.metadata.outputs.package }}
+          path: ../${{ steps.metadata.outputs.package }}
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.metadata.outputs.release_tag }}
+          name: pdg2pdf-linux ${{ steps.metadata.outputs.version }} build ${{ github.run_number }}
+          body: |
+            Automated Debian package built from `${{ github.sha }}`.
+
+            Package version: `${{ steps.metadata.outputs.version }}`
+          files: ../${{ steps.metadata.outputs.package }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true
