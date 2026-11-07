@@ -23,6 +23,10 @@ python3 -m pip install --user img2pdf pikepdf Pillow pytest
 ```bash
 python3 pdg2pdf.py input-book output.pdf
 python3 pdg2pdf.py input-book.zip output.pdf --title "自定义标题"
+python3 pdg2pdf.py input-book output.pdf --fixed-width 1200 --dpi 300
+python3 pdg2pdf.py input-book output.pdf --image-format jpeg --jpeg-quality 85
+python3 pdg2pdf.py input-book --export-bookmarks bookmarks.json
+python3 pdg2pdf.py input-book output.pdf --bookmarks-file bookmarks.json
 ```
 
 `input-book` 可以是包含 PDG 页面的目录，输出路径省略时默认为同名 `.pdf`。

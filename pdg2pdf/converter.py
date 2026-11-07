@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import re
 import shutil
@@ -10,7 +11,7 @@ import zipfile
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterable
 
 import img2pdf
 import pikepdf
@@ -20,7 +21,38 @@ from . import decoder
 
 LOG = logging.getLogger(__name__)
 
-SUPPORTED_SUFFIXES = {".pdg", ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".gif"}
+SUPPORTED_SUFFIXES = {".pdg", ".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".gif"}
+IMAGE_FORMATS = {"original", "jpeg", "png", "tiff"}
+
+
+@dataclass(frozen=True)
+class ConversionOptions:
+    """Conversion settings shared by the command line and GTK front end."""
+
+    dpi: float | None = None
+    fixed_width: int | None = None
+    image_format: str = "original"
+    jpeg_quality: int = 90
+    grayscale: bool = False
+    include_bookmarks: bool = True
+    bookmarks_file: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.dpi is not None and self.dpi <= 0:
+            raise ValueError("DPI must be greater than zero")
+        if self.fixed_width is not None and self.fixed_width <= 0:
+            raise ValueError("fixed width must be greater than zero")
+        if self.image_format not in IMAGE_FORMATS:
+            raise ValueError(f"image format must be one of: {', '.join(sorted(IMAGE_FORMATS))}")
+        if not 1 <= self.jpeg_quality <= 100:
+            raise ValueError("JPEG quality must be between 1 and 100")
+
+
+@dataclass(frozen=True)
+class Bookmark:
+    title: str
+    page: int
+    level: int = 0
 
 
 @dataclass(frozen=True)
@@ -37,6 +69,8 @@ def _natural_key(path: Path):
 
 
 def _magic(data: bytes) -> str | None:
+    if data.startswith(b"%PDF-"):
+        return "pdf"
     if data.startswith(b"\xff\xd8\xff"):
         return "jpeg"
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -52,30 +86,51 @@ def _magic(data: bytes) -> str | None:
     return None
 
 
-def _render_pdg(path: Path, raw: bytes) -> bytes:
+def _render_pdg(path: Path, raw: bytes) -> tuple[bytes, str]:
     width, height = decoder._decode_size_for_pdg(raw)
     decoded, kind = decoder.pdg_decode_pure_bytes(raw, width, height)
     if kind == "djvu":
         executable = shutil.which("ddjvu")
         if not executable:
-            raise RuntimeError("This page contains DjVu data. Install DjVuLibre (for example: apt install djvulibre-bin) to render it.")
+            raise RuntimeError(
+                "This page contains DjVu data. Install DjVuLibre (for example: apt install djvulibre-bin) to render it."
+            )
         proc = subprocess.run(
             [executable, "-format=pnm", "-"], input=decoded, capture_output=True, check=False, timeout=120
         )
         if proc.returncode:
             raise RuntimeError(f"ddjvu could not render {path.name}: {proc.stderr.decode(errors='replace').strip()}")
-        decoded = proc.stdout
-        kind = "pnm"
+        decoded, kind = proc.stdout, "pnm"
     if kind is None:
-        raise RuntimeError(f"Unsupported or encrypted PDG variant in {path.name} (type 0x{raw[15]:02x})")
+        type_byte = raw[15] if len(raw) > 15 else 0
+        raise RuntimeError(f"Unsupported or encrypted PDG variant in {path.name} (type 0x{type_byte:02x})")
+    return decoded, kind
+
+
+def _image_bytes(raw: bytes, kind: str, options: ConversionOptions) -> bytes:
+    if options.image_format == "original" and not options.grayscale and kind in {"jpeg", "png", "tiff", "bmp"}:
+        return raw
     try:
-        with Image.open(io.BytesIO(decoded)) as image:
+        with Image.open(io.BytesIO(raw)) as image:
             image.load()
-            normalized = io.BytesIO()
-            image.save(normalized, format="PNG", optimize=False)
-            return normalized.getvalue()
+            if options.grayscale:
+                image = image.convert("L")
+            elif kind in {"jpeg", "bmp"} or options.image_format == "jpeg":
+                image = image.convert("RGB")
+            target = options.image_format if options.image_format != "original" else ("png" if kind == "gif" else kind)
+            target = {"jpeg": "JPEG", "png": "PNG", "tiff": "TIFF", "bmp": "BMP"}.get(target, "PNG")
+            encoded = io.BytesIO()
+            save_kwargs = {}
+            if target == "JPEG":
+                save_kwargs = {"quality": options.jpeg_quality, "optimize": True}
+            elif target == "PNG":
+                save_kwargs = {"optimize": True}
+            elif target == "TIFF":
+                save_kwargs = {"compression": "tiff_lzw"}
+            image.save(encoded, format=target, **save_kwargs)
+            return encoded.getvalue()
     except (UnidentifiedImageError, OSError) as exc:
-        raise RuntimeError(f"Decoded page is not a valid image: {path.name}") from exc
+        raise RuntimeError("decoded page is not a valid image") from exc
 
 
 def _read_info(root: Path) -> dict[str, str]:
@@ -94,33 +149,71 @@ def _read_info(root: Path) -> dict[str, str]:
     return {}
 
 
-def _read_bookmarks(root: Path, page_count: int) -> list[tuple[str, int, int]]:
-    candidate = next((p for p in root.iterdir() if p.is_file() and p.name.lower() == "bookcontents.dat"), None)
-    if not candidate:
-        return []
-    raw = candidate.read_bytes()
-    text = ""
+def _decode_bookcontents(raw: bytes) -> str:
     for offset in range(len(raw)):
-        if raw[offset:offset + 2] not in (b"\x78\x01", b"\x78\x5e", b"\x78\x9c", b"\x78\xda"):
+        if raw[offset : offset + 2] not in (b"\x78\x01", b"\x78\x5e", b"\x78\x9c", b"\x78\xda"):
             continue
         try:
-            text = zlib.decompress(raw[offset:]).decode("gb18030", errors="replace")
-            break
+            return zlib.decompress(raw[offset:]).decode("gb18030", errors="replace")
         except zlib.error:
             continue
-    bookmarks = []
-    for line in text.splitlines():
-        cols = line.split("|")
-        if len(cols) < 3:
+    return ""
+
+
+def _parse_bookmark_lines(lines: Iterable[str], page_count: int) -> list[Bookmark]:
+    result: list[Bookmark] = []
+    for line in lines:
+        cols = line.rstrip("\r\n").split("|")
+        if len(cols) < 3 or not cols[0].strip():
             continue
         try:
             page = int(cols[2], 16)
             level = max(0, int(cols[4])) if len(cols) > 4 and cols[4].isdigit() else 0
         except ValueError:
             continue
-        if 0 <= page < page_count and cols[0].strip():
-            bookmarks.append((cols[0].strip(), page, level))
-    return bookmarks
+        if 0 <= page < page_count:
+            result.append(Bookmark(cols[0].strip(), page, level))
+    return result
+
+
+def _read_bookmarks(root: Path, page_count: int, override: Path | None = None) -> list[Bookmark]:
+    if override:
+        raw = override.read_text(encoding="utf-8-sig")
+        if override.suffix.lower() == ".json":
+            data = json.loads(raw)
+            return [
+                Bookmark(str(item["title"]), int(item["page"]), max(0, int(item.get("level", 0))))
+                for item in data
+                if 0 <= int(item["page"]) < page_count and str(item["title"]).strip()
+            ]
+        return _parse_bookmark_lines(raw.splitlines(), page_count)
+    candidate = next((p for p in root.iterdir() if p.is_file() and p.name.lower() == "bookcontents.dat"), None)
+    if not candidate:
+        return []
+    return _parse_bookmark_lines(_decode_bookcontents(candidate.read_bytes()).splitlines(), page_count)
+
+
+def write_bookmarks(path: str | Path, bookmarks: Iterable[Bookmark]) -> None:
+    target = Path(path).expanduser()
+    values = list(bookmarks)
+    if target.suffix.lower() == ".json":
+        target.write_text(
+            json.dumps([{"title": item.title, "page": item.page, "level": item.level} for item in values], ensure_ascii=False, indent=2)
+            + "\n",
+            encoding="utf-8",
+        )
+        return
+    target.write_text("\n".join(f"{item.level}|{item.page}|{item.title}" for item in values) + "\n", encoding="utf-8")
+
+
+def export_bookmarks(source: str | Path, target: str | Path) -> int:
+    source = Path(source).expanduser().resolve()
+    target = Path(target).expanduser()
+    with tempfile.TemporaryDirectory(prefix="pdg2pdf-bookmarks-") as tmp:
+        files, root = _collect_pages(source, Path(tmp))
+        bookmarks = _read_bookmarks(root, len(files))
+    write_bookmarks(target, bookmarks)
+    return len(bookmarks)
 
 
 def _collect_pages(source: Path, temp: Path) -> tuple[list[Path], Path]:
@@ -144,66 +237,133 @@ def _collect_pages(source: Path, temp: Path) -> tuple[list[Path], Path]:
     return files, root
 
 
+def _page_width(page: pikepdf.Page) -> float:
+    box = page.mediabox
+    return float(box[2]) - float(box[0])
+
+
+def _scale_pages_to_width(pdf: pikepdf.Pdf, target_width: float) -> None:
+    for page in pdf.pages:
+        box = page.mediabox
+        width = float(box[2]) - float(box[0])
+        height = float(box[3]) - float(box[1])
+        if width <= 0 or abs(width - target_width) < 0.01:
+            continue
+        scale = target_width / width
+        original = page.get("/Contents")
+        prefix = pikepdf.Stream(pdf, f"q {scale:.8f} 0 0 {scale:.8f} 0 0 cm\n".encode("ascii"))
+        suffix = pikepdf.Stream(pdf, b"Q\n")
+        if original is None:
+            page.Contents = pikepdf.Array([prefix, suffix])
+        elif isinstance(original, pikepdf.Array):
+            page.Contents = pikepdf.Array([prefix, *list(original), suffix])
+        else:
+            page.Contents = pikepdf.Array([prefix, original, suffix])
+        new_box = pikepdf.Array([0, 0, target_width, height * scale])
+        page.MediaBox = new_box
+        page.CropBox = new_box
+
+
 def convert_book(
     source: str | Path,
     output: str | Path,
     *,
     title: str | None = None,
     progress: Callable[[int, int, str], None] | None = None,
+    options: ConversionOptions | None = None,
+    dpi: float | None = None,
+    fixed_width: int | None = None,
+    image_format: str = "original",
+    jpeg_quality: int = 90,
+    grayscale: bool = False,
+    bookmarks_file: str | Path | None = None,
+    no_bookmarks: bool = False,
 ) -> ConversionResult:
+    options = options or ConversionOptions(
+        dpi=dpi,
+        fixed_width=fixed_width,
+        image_format=image_format,
+        jpeg_quality=jpeg_quality,
+        grayscale=grayscale,
+        include_bookmarks=not no_bookmarks,
+        bookmarks_file=Path(bookmarks_file).expanduser() if bookmarks_file else None,
+    )
     source, output = Path(source).expanduser().resolve(), Path(output).expanduser().resolve()
     if not source.exists():
         raise FileNotFoundError(source)
     output.parent.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
     with tempfile.TemporaryDirectory(prefix="pdg2pdf-") as tmp:
-        tmpdir = Path(tmp)
-        files, root = _collect_pages(source, tmpdir)
+        files, root = _collect_pages(source, Path(tmp))
+        image_widths: list[int] = []
+        for page in files:
+            raw = page.read_bytes()
+            kind = _magic(raw)
+            try:
+                if kind == "pdf":
+                    continue
+                if kind:
+                    image_data, image_kind = raw, kind
+                elif raw.startswith(b"HH"):
+                    image_data, image_kind = _render_pdg(page, raw)
+                else:
+                    continue
+                with Image.open(io.BytesIO(image_data)) as image:
+                    image_widths.append(image.width)
+            except Exception as exc:
+                raise RuntimeError(f"Failed to inspect page {page.name}: {exc}") from exc
+        effective_dpi = options.dpi or (100 if image_widths and max(image_widths) < 1200 else 300)
         info = _read_info(root) if root.is_dir() else {}
-        page_pdfs: list[bytes] = []
+        pdf = pikepdf.Pdf.new()
         for index, page in enumerate(files, 1):
             raw = page.read_bytes()
             kind = _magic(raw)
             try:
-                if kind:
-                    image_data = raw
-                    if kind == "gif":
-                        with Image.open(io.BytesIO(raw)) as im:
-                            im.seek(0)
-                            b = io.BytesIO()
-                            im.convert("RGB").save(b, format="PNG")
-                            image_data = b.getvalue()
-                elif raw.startswith(b"HH"):
-                    image_data = _render_pdg(page, raw)
+                if kind == "pdf":
+                    with pikepdf.open(io.BytesIO(raw)) as part:
+                        pdf.pages.extend(part.pages)
                 else:
-                    warnings.append(f"Skipped unrecognized file: {page.name}")
-                    continue
-                page_pdfs.append(img2pdf.convert(image_data))
+                    if kind:
+                        image_data, image_kind = raw, kind
+                    elif raw.startswith(b"HH"):
+                        image_data, image_kind = _render_pdg(page, raw)
+                    else:
+                        warnings.append(f"Skipped unrecognized file: {page.name}")
+                        continue
+                    image_data = _image_bytes(image_data, image_kind, options)
+                    layout = img2pdf.get_fixed_dpi_layout_fun((effective_dpi, effective_dpi))
+                    part_bytes = img2pdf.convert(image_data, layout_fun=layout)
+                    with pikepdf.open(io.BytesIO(part_bytes)) as part:
+                        pdf.pages.extend(part.pages)
             except Exception as exc:
                 raise RuntimeError(f"Failed on page {page.name}: {exc}") from exc
             if progress:
                 progress(index, len(files), page.name)
-        if not page_pdfs:
+        if not pdf.pages:
             raise RuntimeError("No pages could be converted")
-        pdf = pikepdf.Pdf.new()
-        for page_pdf in page_pdfs:
-            with pikepdf.open(io.BytesIO(page_pdf)) as part:
-                pdf.pages.extend(part.pages)
+
+        widths = [_page_width(page) for page in pdf.pages]
+        target_width = max(widths)
+        if options.fixed_width:
+            target_dpi = options.dpi or (100 if options.fixed_width < 1200 else 300)
+            target_width = options.fixed_width / target_dpi * 72
+        _scale_pages_to_width(pdf, target_width)
+
         final_title = title or info.get("书名", "").strip() or source.stem
         with pdf.open_metadata() as metadata:
             metadata["dc:title"] = final_title
             author = info.get("作者", "").strip()
             if author:
                 metadata["dc:creator"] = [author]
-        if root.is_dir():
-            bookmarks = _read_bookmarks(root, len(pdf.pages))
+        if options.include_bookmarks and root.is_dir():
+            bookmarks = _read_bookmarks(root, len(pdf.pages), options.bookmarks_file)
             if bookmarks:
                 with pdf.open_outline() as outline:
                     stack = [outline.root]
-                    for label, page, level in bookmarks:
-                        level = min(level, len(stack) - 1)
-                        stack = stack[:level + 1]
-                        item = pikepdf.OutlineItem(label, page)
+                    for bookmark in bookmarks:
+                        level = min(bookmark.level, len(stack) - 1)
+                        stack = stack[: level + 1]
+                        item = pikepdf.OutlineItem(bookmark.title, bookmark.page)
                         stack[-1].append(item)
                         stack.append(item.children)
         pdf.save(output)
