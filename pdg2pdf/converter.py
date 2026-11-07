@@ -342,12 +342,11 @@ def convert_book(
         if not pdf.pages:
             raise RuntimeError("No pages could be converted")
 
-        widths = [_page_width(page) for page in pdf.pages]
-        target_width = max(widths)
         if options.fixed_width:
+            widths = [_page_width(page) for page in pdf.pages]
             target_dpi = options.dpi or (100 if options.fixed_width < 1200 else 300)
             target_width = options.fixed_width / target_dpi * 72
-        _scale_pages_to_width(pdf, target_width)
+            _scale_pages_to_width(pdf, target_width)
 
         final_title = title or info.get("书名", "").strip() or source.stem
         with pdf.open_metadata() as metadata:

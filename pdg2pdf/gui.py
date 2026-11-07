@@ -42,6 +42,9 @@ class ConverterWindow(Gtk.Window):
         source_row.pack_start(zip_button, False, False, 0)
         root.pack_start(source_row, False, False, 0)
         output_row, self.output_entry = self._path_row("输出 PDF", self._choose_output)
+        self._output_is_auto = True
+        self._output_update_in_progress = False
+        self.output_entry.connect("changed", self._on_output_changed)
         root.pack_start(output_row, False, False, 0)
 
         title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -156,8 +159,14 @@ class ConverterWindow(Gtk.Window):
 
     def _set_source(self, filename: str) -> None:
         self.source_entry.set_text(filename)
-        if not self.output_entry.get_text():
+        if self._output_is_auto or not self.output_entry.get_text().strip():
+            self._output_update_in_progress = True
             self.output_entry.set_text(str(Path(filename).with_suffix(".pdf")))
+            self._output_update_in_progress = False
+
+    def _on_output_changed(self, _entry) -> None:
+        if not self._output_update_in_progress:
+            self._output_is_auto = False
 
     def _choose_output(self, _button, entry: Gtk.Entry) -> None:
         dialog = Gtk.FileChooserDialog(title="选择输出 PDF", parent=self, action=Gtk.FileChooserAction.SAVE, buttons=("取消", Gtk.ResponseType.CANCEL, "保存", Gtk.ResponseType.OK))
@@ -168,6 +177,7 @@ class ConverterWindow(Gtk.Window):
             if not filename.lower().endswith(".pdf"):
                 filename += ".pdf"
             entry.set_text(filename)
+            self._output_is_auto = False
         dialog.destroy()
 
     def _start_conversion(self, _button) -> None:

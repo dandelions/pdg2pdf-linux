@@ -47,6 +47,43 @@ def test_single_image_input_is_rejected(tmp_path):
         convert_book(SAMPLES / "cov001.jpg", tmp_path / "single.pdf")
 
 
+def test_pages_keep_original_dimensions_without_fixed_width(tmp_path):
+    from PIL import Image
+
+    source = tmp_path / "original-size"
+    source.mkdir()
+    Image.new("RGB", (600, 900), "white").save(source / "000001.png")
+    Image.new("RGB", (900, 600), "gray").save(source / "000002.png")
+    result = convert_book(source, tmp_path / "original-size.pdf")
+    with pikepdf.open(result.output) as pdf:
+        dimensions = [
+            (float(page.mediabox[2]) - float(page.mediabox[0]), float(page.mediabox[3]) - float(page.mediabox[1]))
+            for page in pdf.pages
+        ]
+    assert dimensions[0] == pytest.approx((432.0, 648.0))
+    assert dimensions[1] == pytest.approx((648.0, 432.0))
+
+
+def test_page_with_white_margins_is_not_cropped(tmp_path):
+    from PIL import Image
+
+    source = tmp_path / "white-margins"
+    source.mkdir()
+    image = Image.new("RGB", (100, 120), "white")
+    image.putpixel((10, 10), (0, 0, 0))
+    image.save(source / "000001.png")
+    result = convert_book(source, tmp_path / "white-margins.pdf")
+    with pikepdf.open(result.output) as pdf:
+        page = pdf.pages[0]
+        width = float(page.mediabox[2]) - float(page.mediabox[0])
+        height = float(page.mediabox[3]) - float(page.mediabox[1])
+        image_object = next(iter(page.images.values()))
+        embedded = pikepdf.PdfImage(image_object).as_pil_image()
+    assert (width, height) == pytest.approx((72.0, 86.4))
+    assert embedded.size == (100, 120)
+    assert embedded.getpixel((99, 119)) == (255, 255, 255)
+
+
 def test_pages_share_the_maximum_width(tmp_path):
     from PIL import Image
 
