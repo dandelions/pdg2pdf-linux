@@ -47,7 +47,7 @@ def test_single_image_input_is_rejected(tmp_path):
         convert_book(SAMPLES / "cov001.jpg", tmp_path / "single.pdf")
 
 
-def test_pages_keep_original_dimensions_without_fixed_width(tmp_path):
+def test_pages_share_maximum_width_by_default(tmp_path):
     from PIL import Image
 
     source = tmp_path / "original-size"
@@ -60,7 +60,7 @@ def test_pages_keep_original_dimensions_without_fixed_width(tmp_path):
             (float(page.mediabox[2]) - float(page.mediabox[0]), float(page.mediabox[3]) - float(page.mediabox[1]))
             for page in pdf.pages
         ]
-    assert dimensions[0] == pytest.approx((432.0, 648.0))
+    assert dimensions[0] == pytest.approx((648.0, 972.0))
     assert dimensions[1] == pytest.approx((648.0, 432.0))
 
 
