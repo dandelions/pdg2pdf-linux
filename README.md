@@ -15,7 +15,7 @@ Linux 原生 PDG 转 PDF 工具，提供命令行和 GTK3 图形界面。转换�
 
 ```bash
 sudo apt install python3-gi gir1.2-gtk-3.0 djvulibre-bin
-python3 -m pip install --user img2pdf pikepdf Pillow pytest
+python3 -m pip install --user -r requirements.txt pytest
 ```
 
 ## 命令行

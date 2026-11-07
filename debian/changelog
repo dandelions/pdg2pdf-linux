@@ -1,3 +1,9 @@
+pdg2pdf-linux (1.0.2-1) unstable; urgency=medium
+
+  * Bundle Python conversion dependencies privately in the Debian package.
+
+ -- dandelions <helium-ci@localhost>  Sat, 07 Nov 2026 12:37:54 +0000
+
 pdg2pdf-linux (1.0.1-1) unstable; urgency=medium
 
   * Add Debian package with CLI and GTK3 desktop launcher.

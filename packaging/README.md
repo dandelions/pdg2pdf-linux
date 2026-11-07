@@ -13,23 +13,22 @@
 输出文件位于项目上一级目录，例如：
 
 ```text
-../pdg2pdf-linux_1.0.1_amd64.deb
+../pdg2pdf-linux_1.0.2_amd64.deb
 ```
 
 安装：
 
 ```bash
-sudo apt install ../pdg2pdf-linux_1.0.1_amd64.deb
+sudo apt install ../pdg2pdf-linux_1.0.2_amd64.deb
 ```
 
 安装过程会自动安装这些运行依赖：
 
 - Python 3.10 或更高版本
 - GTK3 和 `python3-gi`
-- Pillow
-- img2pdf
-- pikepdf
 - DjVuLibre
+
+Pillow、img2pdf、pikepdf 及其 Python 依赖会随 `.deb` 安装到应用自己的私有目录，不需要系统单独安装。
 
 安装完成后：
 

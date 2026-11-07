@@ -24,7 +24,7 @@ jobs:
       - name: Install build and test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev djvulibre-bin
+          sudo apt-get install -y dpkg-dev python3-pip djvulibre-bin
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest
 
@@ -41,7 +41,7 @@ jobs:
         id: metadata
         shell: bash
         run: |
-          version=$(sed -n 's/^pdg2pdf-linux (\([^)]*\)).*/\1/p' debian/changelog | cut -d- -f1)
+          version=$(sed -n '1s/^pdg2pdf-linux (\([^)]*\)).*/\1/p' debian/changelog | cut -d- -f1)
           arch=$(dpkg --print-architecture)
           package="pdg2pdf-linux_${version}_${arch}.deb"
           test -f "dist/$package"

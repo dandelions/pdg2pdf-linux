@@ -2,17 +2,19 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-VERSION=$(sed -n 's/^pdg2pdf-linux (\([^)]*\)).*/\1/p' "$ROOT/debian/changelog" | cut -d- -f1)
+VERSION=$(sed -n '1s/^pdg2pdf-linux (\([^)]*\)).*/\1/p' "$ROOT/debian/changelog" | cut -d- -f1)
 ARCH=$(dpkg --print-architecture)
 PKG="pdg2pdf-linux_${VERSION}_${ARCH}"
-STAGE="$ROOT/../$PKG"
+STAGE=$(mktemp -d "${TMPDIR:-/tmp}/pdg2pdf-deb.XXXXXX")
 OUT="$ROOT/../${PKG}.deb"
+trap 'rm -rf "$STAGE"' EXIT
 
-rm -rf "$STAGE" "$OUT"
 install -d "$STAGE/DEBIAN" "$STAGE/usr/lib/pdg2pdf/pdg2pdf" \
-  "$STAGE/usr/bin" "$STAGE/usr/share/applications" \
-  "$STAGE/usr/share/doc/pdg2pdf-linux"
+  "$STAGE/usr/lib/pdg2pdf/vendor" "$STAGE/usr/bin" \
+  "$STAGE/usr/share/applications" "$STAGE/usr/share/doc/pdg2pdf-linux"
 
+/usr/bin/python3 -m pip install --break-system-packages --no-compile \
+  --target "$STAGE/usr/lib/pdg2pdf/vendor" -r "$ROOT/requirements.txt"
 cp -a "$ROOT/pdg2pdf/"*.py "$STAGE/usr/lib/pdg2pdf/pdg2pdf/"
 install -m 644 "$ROOT/pdg2pdf.py" "$STAGE/usr/lib/pdg2pdf/pdg2pdf.py"
 install -m 755 "$ROOT/debian/pdg2pdf" "$STAGE/usr/bin/pdg2pdf"
@@ -30,7 +32,7 @@ Section: utils
 Priority: optional
 Architecture: $ARCH
 Maintainer: dandelions <helium-ci@localhost>
-Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-3.0, python3-pil, python3-img2pdf, python3-pikepdf, djvulibre-bin
+Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-3.0, djvulibre-bin
 Description: native Linux PDG book converter
  Convert PDG books to PDF without Wine. Includes CLI and GTK3 desktop application.
 EOF

@@ -2,13 +2,13 @@ Source: pdg2pdf-linux
 Section: utils
 Priority: optional
 Maintainer: dandelions <helium-ci@localhost>
-Build-Depends: debhelper-compat (= 13)
+Build-Depends: debhelper-compat (= 13), python3-pip
 Standards-Version: 4.7.0
 Homepage: https://github.com/dandelions/pdg2pdf-linux
 
 Package: pdg2pdf-linux
-Architecture: all
-Depends: ${misc:Depends}, python3 (>= 3.10), python3-gi, gir1.2-gtk-3.0, python3-pil, python3-img2pdf, python3-pikepdf, djvulibre-bin
+Architecture: any
+Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-3.0, djvulibre-bin
 Description: native Linux PDG book converter
  Convert PDG books to PDF without Wine. Supports fake PDG image files,
  standard HH container pages, early encrypted PDG variants, ZIP input,
