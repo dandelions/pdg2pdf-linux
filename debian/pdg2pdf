@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+export PYTHONPATH="/usr/lib/pdg2pdf${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m pdg2pdf.cli "$@"

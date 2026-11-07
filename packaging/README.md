@@ -1,0 +1,54 @@
+# Debian 安装包
+
+项目提供两个 Debian 打包方式。
+
+## 直接构建 `.deb`
+
+只需要 `dpkg-deb`：
+
+```bash
+./packaging/build-deb.sh
+```
+
+输出文件位于项目上一级目录，例如：
+
+```text
+../pdg2pdf-linux_1.0.1_amd64.deb
+```
+
+安装：
+
+```bash
+sudo apt install ../pdg2pdf-linux_1.0.1_amd64.deb
+```
+
+安装过程会自动安装这些运行依赖：
+
+- Python 3.10 或更高版本
+- GTK3 和 `python3-gi`
+- Pillow
+- img2pdf
+- pikepdf
+- DjVuLibre
+
+安装完成后：
+
+```bash
+pdg2pdf-gui
+```
+
+也可以从应用菜单打开 **PDG 转 PDF**，或使用命令行：
+
+```bash
+pdg2pdf /path/to/book /path/to/output.pdf
+```
+
+## 使用 Debian 标准工具构建
+
+如果系统安装了 `debhelper-compat`，也可以执行：
+
+```bash
+dpkg-buildpackage -us -uc -b
+```
+
+生成的 `.deb` 文件在项目上一级目录。

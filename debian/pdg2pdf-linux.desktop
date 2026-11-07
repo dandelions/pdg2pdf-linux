@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PDG 转 PDF
+GenericName=PDG Book Converter
+Comment=Convert PDG books to PDF
+Exec=pdg2pdf-gui
+Icon=pdg2pdf-linux
+Terminal=false
+Categories=Office;Utility;
+StartupNotify=true
