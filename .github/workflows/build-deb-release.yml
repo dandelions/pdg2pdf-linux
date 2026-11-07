@@ -32,7 +32,10 @@ jobs:
         run: python -m pytest -q
 
       - name: Build Debian package
-        run: ./packaging/build-deb.sh
+        run: |
+          ./packaging/build-deb.sh
+          mkdir -p dist
+          cp ../pdg2pdf-linux_*.deb dist/
 
       - name: Read package metadata
         id: metadata
@@ -41,21 +44,21 @@ jobs:
           version=$(sed -n 's/^pdg2pdf-linux (\([^)]*\)).*/\1/p' debian/changelog | cut -d- -f1)
           arch=$(dpkg --print-architecture)
           package="pdg2pdf-linux_${version}_${arch}.deb"
-          test -f "../$package"
+          test -f "dist/$package"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "package=$package" >> "$GITHUB_OUTPUT"
           echo "release_tag=v${version}-build.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Inspect Debian package
         run: |
-          dpkg-deb --info "../${{ steps.metadata.outputs.package }}"
-          dpkg-deb --contents "../${{ steps.metadata.outputs.package }}"
+          dpkg-deb --info "dist/${{ steps.metadata.outputs.package }}"
+          dpkg-deb --contents "dist/${{ steps.metadata.outputs.package }}"
 
       - name: Upload Debian package artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.metadata.outputs.package }}
-          path: ../${{ steps.metadata.outputs.package }}
+          path: dist/${{ steps.metadata.outputs.package }}
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -67,6 +70,6 @@ jobs:
             Automated Debian package built from `${{ github.sha }}`.
 
             Package version: `${{ steps.metadata.outputs.version }}`
-          files: ../${{ steps.metadata.outputs.package }}
+          files: dist/${{ steps.metadata.outputs.package }}
           fail_on_unmatched_files: true
           generate_release_notes: true
