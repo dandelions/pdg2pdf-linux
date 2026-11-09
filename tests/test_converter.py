@@ -64,7 +64,25 @@ def test_pages_share_maximum_width_by_default(tmp_path):
     assert dimensions[1] == pytest.approx((648.0, 432.0))
 
 
-def test_page_with_white_margins_is_not_cropped(tmp_path):
+def test_progress_reports_directory_scan_and_page_preparation(tmp_path):
+    from PIL import Image
+
+    source = tmp_path / "progress"
+    source.mkdir()
+    Image.new("RGB", (100, 120), "white").save(source / "000001.png")
+    events = []
+    result = convert_book(
+        source,
+        tmp_path / "progress.pdf",
+        progress=lambda done, total, name: events.append((done, total, name)),
+    )
+    assert result.page_count == 1
+    assert any(total == 0 and name == "正在扫描目录" for done, total, name in events)
+    assert any(total == 1 and name == "准备：000001.png" for done, total, name in events)
+    assert events[-1] == (1, 1, "000001.png")
+
+
+
     from PIL import Image
 
     source = tmp_path / "white-margins"

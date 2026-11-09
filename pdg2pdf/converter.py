@@ -216,7 +216,11 @@ def export_bookmarks(source: str | Path, target: str | Path) -> int:
     return len(bookmarks)
 
 
-def _collect_pages(source: Path, temp: Path) -> tuple[list[Path], Path]:
+def _collect_pages(
+    source: Path,
+    temp: Path,
+    progress: Callable[[int, int, str], None] | None = None,
+) -> tuple[list[Path], Path]:
     root = source
     if source.is_file() and zipfile.is_zipfile(source):
         root = temp / "input"
@@ -231,7 +235,15 @@ def _collect_pages(source: Path, temp: Path) -> tuple[list[Path], Path]:
         raise ValueError("Input must be a directory or a ZIP archive")
     if not root.is_dir():
         raise ValueError(f"Input directory not found: {root}")
-    files = sorted((p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in SUPPORTED_SUFFIXES), key=_natural_key)
+    files = []
+    if progress:
+        progress(0, 0, "正在扫描目录")
+    for path in root.rglob("*"):
+        if progress:
+            progress(0, 0, f"正在扫描：{path.name}")
+        if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES:
+            files.append(path)
+    files.sort(key=_natural_key)
     if not files:
         raise ValueError("No supported image or PDG pages were found")
     return files, root
@@ -294,9 +306,11 @@ def convert_book(
     output.parent.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
     with tempfile.TemporaryDirectory(prefix="pdg2pdf-") as tmp:
-        files, root = _collect_pages(source, Path(tmp))
+        files, root = _collect_pages(source, Path(tmp), progress)
         image_widths: list[int] = []
-        for page in files:
+        for index, page in enumerate(files, 1):
+            if progress:
+                progress(0, len(files), f"准备：{page.name}")
             raw = page.read_bytes()
             kind = _magic(raw)
             try:

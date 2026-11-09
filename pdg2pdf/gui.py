@@ -226,9 +226,14 @@ class ConverterWindow(Gtk.Window):
             GLib.idle_add(self._finished, f"转换失败：{exc}")
 
     def _progress(self, done: int, total: int, name: str) -> bool:
-        self.progress.set_fraction(done / max(total, 1))
-        self.progress.set_text(f"{done}/{total}  {name}")
-        self.status.set_text(f"正在处理：{name}")
+        if total:
+            self.progress.set_fraction(done / total)
+            self.progress.set_text(f"{done}/{total}  {name}")
+            self.status.set_text(f"正在处理：{name}" if done else name)
+        else:
+            self.progress.pulse()
+            self.progress.set_text(name)
+            self.status.set_text(name)
         return False
 
     def _finished(self, message: str) -> bool:
