@@ -7,8 +7,13 @@ override_dh_auto_build:
 	:
 
 override_dh_auto_install:
-	install -d debian/pdg2pdf-linux/usr/lib/pdg2pdf/pdg2pdf debian/pdg2pdf-linux/usr/lib/pdg2pdf/vendor
-	/usr/bin/python3 -m pip install --break-system-packages --no-compile --target debian/pdg2pdf-linux/usr/lib/pdg2pdf/vendor -r requirements.txt
+	install -d debian/pdg2pdf-linux/usr/lib/pdg2pdf/pdg2pdf debian/pdg2pdf-linux/usr/bin
+	for py in 3.10 3.11 3.12 3.13; do \
+		tag=$$(echo $$py | tr -d .); \
+		/usr/bin/python3 -m pip install --break-system-packages --no-compile \
+			--target debian/pdg2pdf-linux/usr/lib/pdg2pdf/vendor/py$$tag \
+			--python-version $$py --only-binary=:all: -r requirements.txt; \
+	done
 	cp -a pdg2pdf/*.py debian/pdg2pdf-linux/usr/lib/pdg2pdf/pdg2pdf/
 	install -m 644 pdg2pdf.py debian/pdg2pdf-linux/usr/lib/pdg2pdf/pdg2pdf.py
 	install -D -m 755 debian/pdg2pdf debian/pdg2pdf-linux/usr/bin/pdg2pdf

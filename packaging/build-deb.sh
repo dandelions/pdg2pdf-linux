@@ -10,11 +10,14 @@ OUT="$ROOT/../${PKG}.deb"
 trap 'rm -rf "$STAGE"' EXIT
 
 install -d "$STAGE/DEBIAN" "$STAGE/usr/lib/pdg2pdf/pdg2pdf" \
-  "$STAGE/usr/lib/pdg2pdf/vendor" "$STAGE/usr/bin" \
-  "$STAGE/usr/share/applications" "$STAGE/usr/share/doc/pdg2pdf-linux"
+  "$STAGE/usr/bin" "$STAGE/usr/share/applications" \
+  "$STAGE/usr/share/doc/pdg2pdf-linux"
 
-/usr/bin/python3 -m pip install --break-system-packages --no-compile \
-  --target "$STAGE/usr/lib/pdg2pdf/vendor" -r "$ROOT/requirements.txt"
+for py in 3.10 3.11 3.12 3.13; do
+  /usr/bin/python3 -m pip install --break-system-packages --no-compile \
+    --target "$STAGE/usr/lib/pdg2pdf/vendor/py${py/./}" \
+    --python-version "$py" --only-binary=:all: -r "$ROOT/requirements.txt"
+done
 cp -a "$ROOT/pdg2pdf/"*.py "$STAGE/usr/lib/pdg2pdf/pdg2pdf/"
 install -m 644 "$ROOT/pdg2pdf.py" "$STAGE/usr/lib/pdg2pdf/pdg2pdf.py"
 install -m 755 "$ROOT/debian/pdg2pdf" "$STAGE/usr/bin/pdg2pdf"

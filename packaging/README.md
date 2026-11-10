@@ -28,7 +28,7 @@ sudo apt install ../pdg2pdf-linux_1.0.2_amd64.deb
 - GTK3 和 `python3-gi`
 - DjVuLibre
 
-Pillow、img2pdf、pikepdf 及其 Python 依赖会随 `.deb` 安装到应用自己的私有目录，不需要系统单独安装。
+Pillow、img2pdf、pikepdf 及其 Python 依赖会随 `.deb` 安装到应用自己的私有目录，不需要系统单独安装。包内为 Python 3.10、3.11、3.12、3.13 分别准备了一套私有依赖，启动时按系统 `python3` 的实际版本自动选择；如果系统 Python 版本不在此范围内，会提示并回退到系统安装的对应模块。
 
 安装完成后：
 

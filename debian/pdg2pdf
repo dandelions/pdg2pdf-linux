@@ -1,5 +1,13 @@
 #!/bin/sh
 set -eu
 
-export PYTHONPATH="/usr/lib/pdg2pdf/vendor:/usr/lib/pdg2pdf${PYTHONPATH:+:$PYTHONPATH}"
+PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')
+VENDOR="/usr/lib/pdg2pdf/vendor/py${PYVER}"
+if [ ! -d "$VENDOR" ]; then
+    echo "pdg2pdf: no bundled dependencies for Python $(python3 -V 2>&1)" >&2
+    echo "pdg2pdf: falling back to system packages (python3-pil, python3-img2pdf, python3-pikepdf)" >&2
+    export PYTHONPATH="/usr/lib/pdg2pdf${PYTHONPATH:+:$PYTHONPATH}"
+else
+    export PYTHONPATH="${VENDOR}:/usr/lib/pdg2pdf${PYTHONPATH:+:$PYTHONPATH}"
+fi
 exec python3 -m pdg2pdf.cli "$@"
