@@ -67,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"pdg2pdf: error: {exc}", file=sys.stderr)
         return 1
     print(f"Created {result.output} ({result.page_count} pages)")
+    if result.warnings:
+        print(f"Skipped {len(result.warnings)} page(s):", file=sys.stderr)
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
     return 0

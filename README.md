@@ -11,6 +11,8 @@ Linux 原生 PDG 转 PDF 工具，提供命令行和 GTK3 图形界面。转换�
 - `bookinfo.dat` / `bookInfo.txt` 标题和作者
 - `BookContents.dat` 目录书签
 
+无法解码或已损坏的页面会被记录并从输出中跳过，其余页面继续转换；书签页码会按实际输出的页序调整。
+
 对于 DjVu 页面，需要安装 DjVuLibre：
 
 ```bash

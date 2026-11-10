@@ -82,7 +82,7 @@ def test_progress_reports_directory_scan_and_page_preparation(tmp_path):
     assert events[-1] == (1, 1, "000001.png")
 
 
-
+def test_page_with_white_margins_is_not_cropped(tmp_path):
     from PIL import Image
 
     source = tmp_path / "white-margins"
@@ -144,3 +144,52 @@ def test_bookmark_json_override_and_export(tmp_path):
     with pikepdf.open(tmp_path / "edited.pdf") as pdf:
         with pdf.open_outline() as outline:
             assert outline.root[0].title == "Edited"
+
+
+def test_broken_page_is_skipped_and_recorded(tmp_path):
+    import io
+
+    from PIL import Image
+
+    source = tmp_path / "broken"
+    source.mkdir()
+    Image.new("RGB", (100, 120), "white").save(source / "000001.jpg")
+    buffer = io.BytesIO()
+    Image.new("RGB", (100, 120), "gray").save(buffer, format="JPEG")
+    data = buffer.getvalue()
+    (source / "000002.pdg").write_bytes(data[: len(data) // 2])
+    Image.new("RGB", (100, 120), "black").save(source / "000003.jpg")
+    result = convert_book(source, tmp_path / "broken.pdf", no_bookmarks=True)
+    assert result.page_count == 2
+    assert any("000002.pdg" in warning for warning in result.warnings)
+
+
+def test_all_pages_broken_reports_details(tmp_path):
+    source = tmp_path / "all-broken"
+    source.mkdir()
+    (source / "000001.pdg").write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 32)
+    with pytest.raises(RuntimeError, match="000001.pdg"):
+        convert_book(source, tmp_path / "all-broken.pdf", no_bookmarks=True)
+
+
+def test_bookmarks_are_remapped_after_skipped_page(tmp_path):
+    import io
+    import zlib
+
+    from PIL import Image
+
+    source = tmp_path / "bookmarks-skip"
+    source.mkdir()
+    Image.new("RGB", (100, 120), "white").save(source / "000001.jpg")
+    buffer = io.BytesIO()
+    Image.new("RGB", (100, 120), "gray").save(buffer, format="JPEG")
+    data = buffer.getvalue()
+    (source / "000002.pdg").write_bytes(data[: len(data) // 2])
+    Image.new("RGB", (100, 120), "black").save(source / "000003.jpg")
+    (source / "BookContents.dat").write_bytes(zlib.compress("第三章|0|2|0|0\n".encode("gb18030")))
+    result = convert_book(source, tmp_path / "bookmarks-skip.pdf")
+    assert result.page_count == 2
+    with pikepdf.open(result.output) as pdf:
+        with pdf.open_outline() as outline:
+            page = outline.root[0].resolved_destination(pdf).page
+            assert pdf.pages.index(page) == 1

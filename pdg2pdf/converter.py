@@ -308,31 +308,42 @@ def convert_book(
     with tempfile.TemporaryDirectory(prefix="pdg2pdf-") as tmp:
         files, root = _collect_pages(source, Path(tmp), progress)
         image_widths: list[int] = []
-        for index, page in enumerate(files, 1):
+        valid_files: list[tuple[int, Path]] = []
+        for index, page in enumerate(files):
+            relative_name = str(page.relative_to(root)) if page.is_relative_to(root) else page.name
             if progress:
-                progress(0, len(files), f"准备：{page.name}")
-            raw = page.read_bytes()
-            kind = _magic(raw)
+                progress(0, len(files), f"准备：{relative_name}")
             try:
+                raw = page.read_bytes()
+                kind = _magic(raw)
                 if kind == "pdf":
-                    continue
-                if kind:
+                    with pikepdf.open(io.BytesIO(raw)) as part:
+                        if not part.pages:
+                            raise RuntimeError("PDF contains no pages")
+                elif kind:
                     image_data, image_kind = raw, kind
                 elif raw.startswith(b"HH"):
                     image_data, image_kind = _render_pdg(page, raw)
                 else:
+                    warnings.append(f"Skipped unrecognized file: {relative_name}")
                     continue
-                with Image.open(io.BytesIO(image_data)) as image:
-                    image_widths.append(image.width)
+                if kind != "pdf":
+                    with Image.open(io.BytesIO(image_data)) as image:
+                        image.load()
+                        image_widths.append(image.width)
+                valid_files.append((index, page))
             except Exception as exc:
-                raise RuntimeError(f"Failed to inspect page {page.name}: {exc}") from exc
+                warnings.append(f"Skipped page {relative_name}: failed to inspect: {exc}")
         effective_dpi = options.dpi or (100 if image_widths and max(image_widths) < 1200 else 300)
         info = _read_info(root) if root.is_dir() else {}
         pdf = pikepdf.Pdf.new()
-        for index, page in enumerate(files, 1):
-            raw = page.read_bytes()
-            kind = _magic(raw)
+        source_page_map: dict[int, int] = {}
+        for index, (source_index, page) in enumerate(valid_files, 1):
+            relative_name = str(page.relative_to(root)) if page.is_relative_to(root) else page.name
+            page_start = len(pdf.pages)
             try:
+                raw = page.read_bytes()
+                kind = _magic(raw)
                 if kind == "pdf":
                     with pikepdf.open(io.BytesIO(raw)) as part:
                         pdf.pages.extend(part.pages)
@@ -342,19 +353,25 @@ def convert_book(
                     elif raw.startswith(b"HH"):
                         image_data, image_kind = _render_pdg(page, raw)
                     else:
-                        warnings.append(f"Skipped unrecognized file: {page.name}")
+                        warnings.append(f"Skipped unrecognized file: {relative_name}")
                         continue
                     image_data = _image_bytes(image_data, image_kind, options)
                     layout = img2pdf.get_fixed_dpi_layout_fun((effective_dpi, effective_dpi))
                     part_bytes = img2pdf.convert(image_data, layout_fun=layout)
                     with pikepdf.open(io.BytesIO(part_bytes)) as part:
                         pdf.pages.extend(part.pages)
+                source_page_map[source_index] = page_start
             except Exception as exc:
-                raise RuntimeError(f"Failed on page {page.name}: {exc}") from exc
+                if len(pdf.pages) > page_start:
+                    del pdf.pages[page_start:]
+                warnings.append(f"Skipped page {relative_name}: {exc}")
             if progress:
-                progress(index, len(files), page.name)
+                progress(index, len(valid_files), relative_name)
         if not pdf.pages:
-            raise RuntimeError("No pages could be converted")
+            details = "; ".join(warnings)
+            raise RuntimeError(
+                f"No pages could be converted. {details}" if details else "No pages could be converted"
+            )
 
         widths = [_page_width(page) for page in pdf.pages]
         target_width = max(widths)
@@ -370,14 +387,17 @@ def convert_book(
             if author:
                 metadata["dc:creator"] = [author]
         if options.include_bookmarks and root.is_dir():
-            bookmarks = _read_bookmarks(root, len(pdf.pages), options.bookmarks_file)
+            bookmarks = _read_bookmarks(root, len(files), options.bookmarks_file)
             if bookmarks:
                 with pdf.open_outline() as outline:
                     stack = [outline.root]
                     for bookmark in bookmarks:
+                        target = source_page_map.get(bookmark.page)
+                        if target is None:
+                            continue
                         level = min(bookmark.level, len(stack) - 1)
                         stack = stack[: level + 1]
-                        item = pikepdf.OutlineItem(bookmark.title, bookmark.page)
+                        item = pikepdf.OutlineItem(bookmark.title, target)
                         stack[-1].append(item)
                         stack.append(item.children)
         pdf.save(output)

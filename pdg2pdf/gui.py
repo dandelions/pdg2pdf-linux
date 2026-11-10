@@ -221,9 +221,12 @@ class ConverterWindow(Gtk.Window):
                 bookmarks_file=bookmark_file or None,
                 progress=lambda done, total, name: GLib.idle_add(self._progress, done, total, name),
             )
-            GLib.idle_add(self._finished, f"转换完成：{result.output}，共 {result.page_count} 页")
+            message = f"转换完成：{result.output}，共 {result.page_count} 页"
+            if result.warnings:
+                message += f"，已跳过 {len(result.warnings)} 项"
+            GLib.idle_add(self._finished, message, list(result.warnings))
         except Exception as exc:
-            GLib.idle_add(self._finished, f"转换失败：{exc}")
+            GLib.idle_add(self._finished, f"转换失败：{exc}", [])
 
     def _progress(self, done: int, total: int, name: str) -> bool:
         if total:
@@ -236,7 +239,7 @@ class ConverterWindow(Gtk.Window):
             self.status.set_text(name)
         return False
 
-    def _finished(self, message: str) -> bool:
+    def _finished(self, message: str, warnings: list[str] | None = None) -> bool:
         self._busy = False
         self.convert_button.set_sensitive(True)
         self.status.set_text(message)
@@ -245,6 +248,17 @@ class ConverterWindow(Gtk.Window):
             self.progress.set_text("完成")
         else:
             self.progress.set_text("失败")
+        if warnings:
+            dialog = Gtk.MessageDialog(
+                transient_for=self,
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.CLOSE,
+                text=f"已跳过 {len(warnings)} 个页面",
+            )
+            dialog.format_secondary_text("\n".join(warnings[:20]))
+            dialog.run()
+            dialog.destroy()
         return False
 
 
