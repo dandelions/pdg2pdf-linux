@@ -19,6 +19,11 @@ override_dh_auto_install:
 	install -D -m 755 debian/pdg2pdf debian/pdg2pdf-linux/usr/bin/pdg2pdf
 	install -D -m 755 debian/pdg2pdf-gui debian/pdg2pdf-linux/usr/bin/pdg2pdf-gui
 	install -D -m 644 debian/pdg2pdf-linux.desktop debian/pdg2pdf-linux/usr/share/applications/pdg2pdf-linux.desktop
+	install -D -m 644 assets/pdg2pdf-linux.svg debian/pdg2pdf-linux/usr/share/icons/hicolor/scalable/apps/pdg2pdf-linux.svg
+	for size in 16 22 24 32 48 64 128 256 512; do \
+		install -D -m 644 assets/icons/pdg2pdf-linux-$$size.png \
+			debian/pdg2pdf-linux/usr/share/icons/hicolor/$${size}x$${size}/apps/pdg2pdf-linux.png; \
+	done
 	install -D -m 644 README.md debian/pdg2pdf-linux/usr/share/doc/pdg2pdf-linux/README.md
 	install -D -m 644 LICENSE debian/pdg2pdf-linux/usr/share/doc/pdg2pdf-linux/copyright
 	install -D -m 644 THIRD_PARTY_NOTICES.md debian/pdg2pdf-linux/usr/share/doc/pdg2pdf-linux/THIRD_PARTY_NOTICES.md

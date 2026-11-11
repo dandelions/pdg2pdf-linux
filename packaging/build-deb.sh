@@ -23,6 +23,11 @@ install -m 644 "$ROOT/pdg2pdf.py" "$STAGE/usr/lib/pdg2pdf/pdg2pdf.py"
 install -m 755 "$ROOT/debian/pdg2pdf" "$STAGE/usr/bin/pdg2pdf"
 install -m 755 "$ROOT/debian/pdg2pdf-gui" "$STAGE/usr/bin/pdg2pdf-gui"
 install -m 644 "$ROOT/debian/pdg2pdf-linux.desktop" "$STAGE/usr/share/applications/pdg2pdf-linux.desktop"
+install -D -m 644 "$ROOT/assets/pdg2pdf-linux.svg" "$STAGE/usr/share/icons/hicolor/scalable/apps/pdg2pdf-linux.svg"
+for size in 16 22 24 32 48 64 128 256 512; do
+  install -D -m 644 "$ROOT/assets/icons/pdg2pdf-linux-${size}.png" \
+    "$STAGE/usr/share/icons/hicolor/${size}x${size}/apps/pdg2pdf-linux.png"
+done
 install -m 644 "$ROOT/README.md" "$STAGE/usr/share/doc/pdg2pdf-linux/README.md"
 install -m 644 "$ROOT/LICENSE" "$STAGE/usr/share/doc/pdg2pdf-linux/copyright"
 install -m 644 "$ROOT/THIRD_PARTY_NOTICES.md" "$STAGE/usr/share/doc/pdg2pdf-linux/THIRD_PARTY_NOTICES.md"

@@ -10,10 +10,21 @@ from gi.repository import GLib, Gtk
 
 from .converter import convert_book
 
+APP_ID = "pdg2pdf-linux"
+APP_NAME = "PDG 转 PDF"
+
+
+def _set_default_icon() -> None:
+    bundled = Path(__file__).resolve().parent.parent / "assets" / "icons" / f"{APP_ID}-256.png"
+    if bundled.is_file():
+        Gtk.Window.set_default_icon_from_file(str(bundled))
+    else:
+        Gtk.Window.set_default_icon_name(APP_ID)
+
 
 class ConverterWindow(Gtk.Window):
     def __init__(self) -> None:
-        super().__init__(title="PDG 转 PDF")
+        super().__init__(title=APP_NAME)
         self.set_default_size(760, 560)
         self.set_border_width(18)
         self.set_resizable(True)
@@ -263,6 +274,9 @@ class ConverterWindow(Gtk.Window):
 
 
 def run_gui() -> int:
+    GLib.set_prgname(APP_ID)
+    GLib.set_application_name(APP_NAME)
+    _set_default_icon()
     window = ConverterWindow()
     window.show_all()
     Gtk.main()

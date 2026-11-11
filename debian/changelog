@@ -1,3 +1,9 @@
+pdg2pdf-linux (1.0.4-1) unstable; urgency=medium
+
+  * Ship an application icon in the hicolor theme and use it for the window.
+
+ -- dandelions <helium-ci@localhost>  Wed, 11 Nov 2026 07:50:00 +0000
+
 pdg2pdf-linux (1.0.3-1) unstable; urgency=medium
 
   * Vendor Python dependencies for Python 3.10, 3.11, 3.12 and 3.13 so the

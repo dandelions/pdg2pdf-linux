@@ -6,5 +6,6 @@ Comment=Convert PDG books to PDF
 Exec=pdg2pdf-gui
 Icon=pdg2pdf-linux
 Terminal=false
-Categories=Office;Utility;
+Categories=Office;
 StartupNotify=true
+StartupWMClass=pdg2pdf-linux
