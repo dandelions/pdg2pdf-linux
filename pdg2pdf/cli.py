@@ -12,7 +12,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pdg2pdf",
         description="Convert PDG books or image directories to a PDF on Linux.",
     )
-    parser.add_argument("input", nargs="?", help="PDG directory or ZIP archive")
+    parser.add_argument("input", nargs="?", help="PDG directory, ZIP or UVZ archive")
     parser.add_argument("output", nargs="?", help="Output PDF path")
     parser.add_argument("--title", help="Override the PDF title")
     parser.add_argument("--dpi", type=float, help="Image DPI used when placing pages in PDF")
@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.export_bookmarks:
         if not args.input:
-            print("pdg2pdf: error: --export-bookmarks requires an input directory or ZIP", file=sys.stderr)
+            print("pdg2pdf: error: --export-bookmarks requires an input directory, ZIP or UVZ", file=sys.stderr)
             return 2
         try:
             count = export_bookmarks(args.input, args.export_bookmarks)

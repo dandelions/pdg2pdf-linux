@@ -22,6 +22,7 @@ from . import decoder
 LOG = logging.getLogger(__name__)
 
 SUPPORTED_SUFFIXES = {".pdg", ".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".gif"}
+ARCHIVE_SUFFIXES = {".zip", ".uvz"}
 IMAGE_FORMATS = {"original", "jpeg", "png", "tiff"}
 
 
@@ -231,8 +232,10 @@ def _collect_pages(
                 if root.resolve() not in target.parents and target != root.resolve():
                     raise RuntimeError("Archive contains an unsafe path")
             archive.extractall(root)
+    elif source.is_file() and source.suffix.lower() in ARCHIVE_SUFFIXES:
+        raise ValueError(f"Input archive is not a valid ZIP/UVZ file: {source.name}")
     elif source.is_file():
-        raise ValueError("Input must be a directory or a ZIP archive")
+        raise ValueError("Input must be a directory, ZIP or UVZ archive")
     if not root.is_dir():
         raise ValueError(f"Input directory not found: {root}")
     files = []

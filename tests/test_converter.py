@@ -33,6 +33,23 @@ def test_zip_input_converts(tmp_path):
     assert result.page_count == 16
 
 
+def test_uvz_input_converts(tmp_path):
+    archive = tmp_path / "book.uvz"
+    with zipfile.ZipFile(archive, "w") as zf:
+        for path in SAMPLES.iterdir():
+            if path.is_file():
+                zf.write(path, path.name)
+    result = convert_book(archive, tmp_path / "from-uvz.pdf")
+    assert result.page_count == 16
+
+
+def test_invalid_uvz_reports_archive_error(tmp_path):
+    archive = tmp_path / "broken.uvz"
+    archive.write_bytes(b"not a zip archive")
+    with pytest.raises(ValueError, match="not a valid ZIP/UVZ"):
+        convert_book(archive, tmp_path / "broken.pdf")
+
+
 def test_zip_traversal_is_rejected(tmp_path):
     archive = tmp_path / "unsafe.zip"
     with zipfile.ZipFile(archive, "w") as zf:
@@ -43,7 +60,7 @@ def test_zip_traversal_is_rejected(tmp_path):
 
 
 def test_single_image_input_is_rejected(tmp_path):
-    with pytest.raises(ValueError, match="directory or a ZIP"):
+    with pytest.raises(ValueError, match="directory, ZIP or UVZ"):
         convert_book(SAMPLES / "cov001.jpg", tmp_path / "single.pdf")
 
 

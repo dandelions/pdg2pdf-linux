@@ -1,3 +1,10 @@
+pdg2pdf-linux (1.0.5-1) unstable; urgency=medium
+
+  * Redesign the application icon with a transparent background and bold PDG.
+  * Accept UVZ archives as input alongside ZIP.
+
+ -- dandelions <helium-ci@localhost>  Wed, 11 Nov 2026 08:10:00 +0000
+
 pdg2pdf-linux (1.0.4-1) unstable; urgency=medium
 
   * Ship an application icon in the hicolor theme and use it for the window.

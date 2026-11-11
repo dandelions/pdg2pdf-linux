@@ -34,18 +34,18 @@ class ConverterWindow(Gtk.Window):
         self.add(root)
 
         heading = Gtk.Label()
-        heading.set_markup("<big><b>PDG 转 PDF</b></big>\n支持目录、ZIP、伪 PDG、HH 容器、早期加密 PDG 和文字版 PDG")
+        heading.set_markup("<big><b>PDG 转 PDF</b></big>\n支持目录、ZIP/UVZ、伪 PDG、HH 容器、早期加密 PDG 和文字版 PDG")
         heading.set_xalign(0)
         root.pack_start(heading, False, False, 0)
 
         source_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        source_label = Gtk.Label(label="输入目录或 ZIP")
+        source_label = Gtk.Label(label="输入目录、ZIP 或 UVZ")
         source_label.set_xalign(0)
         self.source_entry = Gtk.Entry()
         self.source_entry.set_hexpand(True)
         folder_button = Gtk.Button(label="选目录")
         folder_button.connect("clicked", self._choose_source_folder)
-        zip_button = Gtk.Button(label="选 ZIP")
+        zip_button = Gtk.Button(label="选 ZIP/UVZ")
         zip_button.connect("clicked", self._choose_source_zip)
         source_row.pack_start(source_label, False, False, 0)
         source_row.pack_start(self.source_entry, True, True, 0)
@@ -99,7 +99,7 @@ class ConverterWindow(Gtk.Window):
         self.progress.set_show_text(True)
         root.pack_start(self.progress, False, False, 0)
 
-        self.status = Gtk.Label(label="请选择输入目录或 ZIP 文件")
+        self.status = Gtk.Label(label="请选择输入目录、ZIP 或 UVZ 文件")
         self.status.set_xalign(0)
         self.status.set_line_wrap(True)
         root.pack_start(self.status, False, False, 0)
@@ -151,10 +151,11 @@ class ConverterWindow(Gtk.Window):
         dialog.destroy()
 
     def _choose_source_zip(self, _button) -> None:
-        dialog = Gtk.FileChooserDialog(title="选择输入 ZIP", parent=self, action=Gtk.FileChooserAction.OPEN, buttons=("取消", Gtk.ResponseType.CANCEL, "选择", Gtk.ResponseType.OK))
+        dialog = Gtk.FileChooserDialog(title="选择输入 ZIP 或 UVZ", parent=self, action=Gtk.FileChooserAction.OPEN, buttons=("取消", Gtk.ResponseType.CANCEL, "选择", Gtk.ResponseType.OK))
         filter_zip = Gtk.FileFilter()
-        filter_zip.set_name("ZIP archive")
+        filter_zip.set_name("ZIP / UVZ archive")
         filter_zip.add_pattern("*.zip")
+        filter_zip.add_pattern("*.uvz")
         dialog.add_filter(filter_zip)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:

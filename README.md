@@ -7,7 +7,7 @@ Linux 原生 PDG 转 PDF 工具，提供命令行和 GTK3 图形界面。转换�
 - 伪 PDG：文件内容实际为 JPEG、PNG、BMP、TIFF 或 GIF，只是扩展名为 `.pdg`
 - 标准 HH 容器 PDG：包括 JPEG、PNG、BMP、DjVu 等页面载荷
 - 早期历史版本加密 PDG：Type 1-5、11-1C、A0-AF
-- 输入目录或 ZIP 书包
+- 输入目录、ZIP 或 UVZ 书包（UVZ 是 ZIP 容器，可直接选择）
 - `bookinfo.dat` / `bookInfo.txt` 标题和作者
 - `BookContents.dat` 目录书签
 
@@ -25,13 +25,14 @@ python3 -m pip install --user -r requirements.txt pytest
 ```bash
 python3 pdg2pdf.py input-book output.pdf
 python3 pdg2pdf.py input-book.zip output.pdf --title "自定义标题"
+python3 pdg2pdf.py input-book.uvz output.pdf
 python3 pdg2pdf.py input-book output.pdf --fixed-width 1200 --dpi 300
 python3 pdg2pdf.py input-book output.pdf --image-format jpeg --jpeg-quality 85
 python3 pdg2pdf.py input-book --export-bookmarks bookmarks.json
 python3 pdg2pdf.py input-book output.pdf --bookmarks-file bookmarks.json
 ```
 
-`input-book` 可以是包含 PDG 页面的目录，输出路径省略时默认为同名 `.pdf`。
+`input-book` 可以是包含 PDG 页面的目录、ZIP 或 UVZ 档案，输出路径省略时默认为同名 `.pdf`。
 
 ## 图形界面
 
